@@ -1,31 +1,438 @@
-.App {
-  text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-.App-header {
-  background-color: #282c34;
+.app-shell {
   min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: calc(20px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));
+}
+
+.phone-frame {
+  width: min(100%, 430px);
+  min-height: min(92vh, 860px);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(91, 63, 216, 0.12);
+  box-shadow: 0 32px 80px rgba(69, 46, 126, 0.18);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  background: rgba(255, 255, 255, 0.4);
+  border-bottom: 1px solid rgba(91, 63, 216, 0.08);
+}
+
+.nav-button,
+.status-button,
+.action-chip,
+.primary-button,
+.secondary-button {
+  font: inherit;
+}
+
+.nav-button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(91, 63, 216, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.nav-button span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: #4b2ba8;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #8b5cf6, #5a3fd8 68%, #312e81);
+  position: relative;
+  box-shadow: 0 12px 24px rgba(90, 63, 216, 0.25);
+}
+
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 10px 10px 6px 6px;
+  background: rgba(255, 255, 255, 0.88);
+  clip-path: polygon(12% 18%, 66% 18%, 86% 40%, 86% 82%, 12% 82%);
+}
+
+.brand-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #22163a;
+}
+
+.brand-subtitle {
+  font-size: 0.67rem;
+  font-weight: 700;
+  color: #76679b;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.status-button {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(91, 63, 216, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+}
+
+.status-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f472b6, #8b5cf6);
+  border: 2px solid #fff;
+}
+
+.content {
+  padding: 18px 18px 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.hero {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(245, 240, 255, 0.9));
+  border: 1px solid rgba(90, 63, 216, 0.08);
+  border-radius: 28px;
+  padding: 20px 18px 18px;
+  box-shadow: 0 18px 38px rgba(90, 63, 216, 0.08);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6f6291;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.1rem, 7vw, 3.1rem);
+  line-height: 1.02;
+  letter-spacing: -0.06em;
+  color: #211639;
+}
+
+.subtitle {
+  margin-top: 12px;
+  color: #645a82;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.cta-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.primary-button,
+.secondary-button {
+  flex: 1;
+  border: 0;
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #6d4ef7, #4f46e5);
+  color: white;
+  box-shadow: 0 16px 30px rgba(95, 79, 255, 0.35);
+}
+
+.secondary-button {
+  background: rgba(90, 63, 216, 0.08);
+  color: #2b1e4d;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.action-chip:hover {
+  transform: translateY(-1px);
+}
+
+.storage-card {
+  border-radius: 26px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.06));
+  border: 1px solid rgba(91, 63, 216, 0.08);
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6f6291;
+  font-weight: 800;
+}
+
+.storage-card h2 {
+  margin: 6px 0 0;
+  font-size: clamp(1.8rem, 6vw, 2.5rem);
+  letter-spacing: -0.06em;
+  color: #24173d;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.pill.success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #0d8b64;
+}
+
+.meter {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(91, 63, 216, 0.1);
+  margin-top: 18px;
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  width: 72%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8b5cf6, #6d4ef7, #4f46e5);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(91, 63, 216, 0.08);
+}
+
+.stats strong {
+  font-size: 1rem;
+  color: #1d1330;
+}
+
+.stats span {
+  font-size: 0.72rem;
+  color: #71678c;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-chip {
+  border: 1px solid rgba(91, 63, 216, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  padding: 12px 8px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8px;
+  color: #2a1c47;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.action-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+
+.action-icon.purple { background: rgba(168, 85, 247, 0.14); }
+.action-icon.blue { background: rgba(96, 165, 250, 0.14); }
+.action-icon.pink { background: rgba(244, 114, 182, 0.14); }
+.action-icon.green { background: rgba(16, 185, 129, 0.12); }
+
+.files-panel {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(91, 63, 216, 0.08);
+  border-radius: 24px;
+  padding: 16px 14px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.panel-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: -0.04em;
+  color: #211639;
+}
+
+.panel-head a {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #4f46e5;
+}
+
+.file-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(91, 63, 216, 0.06);
+}
+
+.file-row:first-of-type {
+  border-top: 0;
+}
+
+.file-badge {
+  min-width: 46px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: rgba(91, 63, 216, 0.08);
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #473490;
+}
+
+.file-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.file-meta strong {
+  font-size: 0.82rem;
+  color: #201635;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-meta span {
+  font-size: 0.7rem;
+  color: #6d6288;
+}
+
+.file-status {
+  display: inline-flex;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 8px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: capitalize;
 }
 
-.App-link {
-  color: #61dafb;
+.file-status.ready {
+  background: rgba(16, 185, 129, 0.12);
+  color: #0f8f66;
 }
 
-.heart {
-  color: #ff0000;
+.file-status.shared {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2166c9;
 }
 
-.small {
-  font-size: 0.75rem;
+.file-status.syncing {
+  background: rgba(245, 158, 11, 0.12);
+  color: #bf7d09;
+}
+
+@media (min-width: 540px) {
+  .phone-frame {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .topbar {
+    gap: 8px;
+  }
+
+  .brand-block {
+    gap: 8px;
+  }
+
+  .brand-name {
+    font-size: 0.8rem;
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
