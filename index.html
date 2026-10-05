@@ -2023,6 +2023,7 @@
           <div id="loginPanel" class="form-panel active">
             <h2 class="section-title">Login to Wohoo</h2>
             <p class="section-sub">Use your email and password to access your cloud space.</p>
+            <p id="authServiceStatus" class="subtle" role="status" aria-live="polite" style="margin:-8px 0 14px;">Connecting to authentication service…</p>
 
             <form id="loginForm" class="form-grid">
               <div class="field full">
@@ -3513,50 +3514,93 @@
       });
     }
 
-    async function initSupabase() {
-      // Pin the SDK version because the latest package may use APIs unsupported
-      // by older Android WebViews. Use a second CDN if the first is unavailable.
-      const supabaseScripts = [
-        "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.js",
-        "https://unpkg.com/@supabase/supabase-js@2.49.1/dist/umd/supabase.js"
-      ];
+    let supabaseInitPromise = null;
+    let supabaseInitAttempts = 0;
 
-      try {
-        await loadSupabaseScript(supabaseScripts);
+    function setAuthServiceStatus(message, isError) {
+      const status = $("authServiceStatus");
+      if (!status) return;
+      status.textContent = message;
+      status.style.color = isError ? "#ef4444" : "";
+    }
 
-        if (!window.supabase?.createClient) {
-          throw new Error("Supabase client is unavailable.");
-        }
+    function waitForSupabaseClient(timeoutMs) {
+      return new Promise((resolve, reject) => {
+        const started = Date.now();
+        const check = () => {
+          if (window.supabase && typeof window.supabase.createClient === "function") {
+            resolve();
+            return;
+          }
+          if (Date.now() - started >= timeoutMs) {
+            reject(new Error("Supabase client did not become available."));
+            return;
+          }
+          setTimeout(check, 250);
+        };
+        check();
+      });
+    }
 
-        state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    async function initSupabase(forceRetry) {
+      if (state.supabase) return state.supabase;
+      // Do not start two SDK downloads when the user taps Login while the
+      // initial WebView connection is still in progress.
+      if (supabaseInitPromise) return supabaseInitPromise;
 
-        const { data, error } = await state.supabase.auth.getSession();
-        if (error) throw error;
+      supabaseInitPromise = (async () => {
+        supabaseInitAttempts += 1;
+        setAuthServiceStatus("Connecting to authentication service…", false);
 
-        if (data?.session) {
-          state.session = data.session;
-          state.user = data.session.user;
-          await loadUserData();
-          showDashboard();
-        }
+        // Keep this version fixed for Android WebView compatibility. If a CDN
+        // request is slow, the second CDN is tried by loadSupabaseScript().
+        const supabaseScripts = [
+          "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.js",
+          "https://unpkg.com/@supabase/supabase-js@2.49.1/dist/umd/supabase.js"
+        ];
 
-        state.supabase.auth.onAuthStateChange(async (_event, session) => {
-          state.session = session;
-          state.user = session?.user || null;
+        try {
+          await loadSupabaseScript(supabaseScripts);
+          await waitForSupabaseClient(10000);
+          state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-          if (state.user) {
+          const sessionResult = await state.supabase.auth.getSession();
+          if (sessionResult.error) throw sessionResult.error;
+
+          setAuthServiceStatus("Authentication service connected.", false);
+
+          if (sessionResult.data && sessionResult.data.session) {
+            state.session = sessionResult.data.session;
+            state.user = sessionResult.data.session.user;
             await loadUserData();
             showDashboard();
-          } else {
-            state.profile = null;
-            state.uploads = [];
-            showAuth();
           }
-        });
-      } catch (error) {
-        console.error("Supabase initialization failed:", error);
-        toast("Supabase could not load. Check the WebView internet permission, then reload.", "error");
-      }
+
+          state.supabase.auth.onAuthStateChange(async function(_event, session) {
+            state.session = session;
+            state.user = session ? session.user : null;
+
+            if (state.user) {
+              await loadUserData();
+              showDashboard();
+            } else {
+              state.profile = null;
+              state.uploads = [];
+              showAuth();
+            }
+          });
+
+          return state.supabase;
+        } catch (error) {
+          console.error("Supabase initialization failed:", error);
+          state.supabase = null;
+          supabaseInitPromise = null;
+          setAuthServiceStatus("Authentication service is unavailable. Check internet access and tap Login again.", true);
+          throw error;
+        }
+      })();
+
+      return supabaseInitPromise;
     }
 
     async function loadUserData() {
@@ -3674,21 +3718,42 @@
 
     $("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!state.supabase) {
-        toast("Authentication is still loading. Please wait a moment and try again.", "error");
-        initSupabase();
-        return;
-      }
-
+      const button = e.target.querySelector("button[type=submit]");
+      const originalText = button ? button.textContent : "Login";
       const email = $("loginEmail").value.trim();
       const password = $("loginPassword").value;
 
-      const { error } = await state.supabase.auth.signInWithPassword({ email, password });
+      if (!email || !password) {
+        toast("Enter your email and password.", "error");
+        return;
+      }
 
-      if (error) {
-        toast(error.message, "error");
-      } else {
-        toast("Login successful.", "success");
+      try {
+        if (!state.supabase) {
+          setAuthServiceStatus("Connecting to authentication service…", false);
+          await initSupabase(true);
+        }
+
+        if (button) {
+          button.disabled = true;
+          button.textContent = "Signing in…";
+        }
+
+        const { error } = await state.supabase.auth.signInWithPassword({ email, password });
+
+        if (error) {
+          toast(error.message, "error");
+        } else {
+          toast("Login successful.", "success");
+        }
+      } catch (error) {
+        console.error("Login initialization failed:", error);
+        toast("Authentication service is unavailable. Check the app Internet permission and try again.", "error");
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
       }
     });
 
