@@ -3478,21 +3478,61 @@
       }
     }
 
-    async function initSupabase() {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-      script.onerror = () => {
-        toast("Authentication service could not load. Check your connection and reload.", "error");
-      };
-      script.onload = async () => {
-        if (!window.supabase?.createClient) {
-          toast("Authentication service is unavailable.", "error");
+    function loadSupabaseScript(urls, index = 0) {
+      return new Promise((resolve, reject) => {
+        if (window.supabase?.createClient) {
+          resolve();
           return;
+        }
+
+        if (index >= urls.length) {
+          reject(new Error("Supabase client could not be loaded."));
+          return;
+        }
+
+        const script = document.createElement("script");
+        let settled = false;
+        const finish = (error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          script.onload = null;
+          script.onerror = null;
+          error ? loadSupabaseScript(urls, index + 1).then(resolve).catch(reject) : resolve();
+        };
+
+        const timeoutId = setTimeout(() => finish(new Error("Supabase loading timed out.")), 15000);
+        script.src = urls[index];
+        script.async = true;
+        script.onload = () => {
+          if (window.supabase?.createClient) finish();
+          else finish(new Error("Invalid Supabase client."));
+        };
+        script.onerror = () => finish(new Error("Supabase CDN request failed."));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function initSupabase() {
+      // Pin the SDK version because the latest package may use APIs unsupported
+      // by older Android WebViews. Use a second CDN if the first is unavailable.
+      const supabaseScripts = [
+        "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.js",
+        "https://unpkg.com/@supabase/supabase-js@2.49.1/dist/umd/supabase.js"
+      ];
+
+      try {
+        await loadSupabaseScript(supabaseScripts);
+
+        if (!window.supabase?.createClient) {
+          throw new Error("Supabase client is unavailable.");
         }
 
         state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const { data } = await state.supabase.auth.getSession();
+        const { data, error } = await state.supabase.auth.getSession();
+        if (error) throw error;
+
         if (data?.session) {
           state.session = data.session;
           state.user = data.session.user;
@@ -3513,8 +3553,10 @@
             showAuth();
           }
         });
-      };
-      document.head.appendChild(script);
+      } catch (error) {
+        console.error("Supabase initialization failed:", error);
+        toast("Supabase could not load. Check the WebView internet permission, then reload.", "error");
+      }
     }
 
     async function loadUserData() {
@@ -3632,7 +3674,11 @@
 
     $("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!state.supabase) return toast("Supabase not ready yet.", "error");
+      if (!state.supabase) {
+        toast("Authentication is still loading. Please wait a moment and try again.", "error");
+        initSupabase();
+        return;
+      }
 
       const email = $("loginEmail").value.trim();
       const password = $("loginPassword").value;
