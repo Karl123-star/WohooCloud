@@ -1742,6 +1742,109 @@
       .file-item{padding:10px}
       .file-actions .tiny{font-size:.72rem}
     }
+
+    /* Android 8+ compatibility and small-screen hardening */
+    html, body{
+      width:100%;
+      max-width:100%;
+      overflow-x:hidden;
+    }
+
+    button, a, input, select, textarea{
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+
+    input, select, textarea, button{
+      max-width:100%;
+    }
+
+    @supports not (backdrop-filter: blur(1px)){
+      .topbar,
+      .drawer,
+      .notif-panel,
+      .hero-panel,
+      .auth-panel,
+      .panel,
+      .modal{
+        background:rgba(255,255,255,.96);
+      }
+    }
+
+    @media (max-width: 600px){
+      /* Use vh first for Android WebViews that do not understand dvh. */
+      .modal{
+        max-height:calc(100vh - 24px);
+        max-height:calc(100dvh - 24px);
+      }
+
+      .auth-wrap,
+      .app-main,
+      .topbar-inner{
+        width:100%;
+        max-width:100%;
+      }
+
+      .form-grid,
+      .welcome,
+      .dashboard,
+      .profile-grid{
+        min-width:0;
+      }
+
+      .field,
+      .profile-card,
+      .file-meta,
+      .file-actions{
+        min-width:0;
+      }
+
+      .file-meta strong,
+      .file-meta small,
+      .profile-card strong,
+      .subtle{
+        overflow-wrap:anywhere;
+        word-break:break-word;
+      }
+
+      input[type="file"]{
+        min-width:0;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+
+      .row-between > h1,
+      .row-between > h2,
+      .row-between > h3,
+      .row-between > div{
+        min-width:0;
+      }
+
+      .modal-header > div{
+        min-width:0;
+      }
+
+      .modal-header h2{
+        overflow-wrap:anywhere;
+      }
+    }
+
+    @media (orientation:landscape) and (max-width:700px){
+      .auth-wrap{
+        align-items:center;
+        min-height:calc(100vh - 12px);
+        padding-top:10px;
+        padding-bottom:18px;
+      }
+
+      .auth-panel{
+        max-width:620px;
+      }
+
+      .modal{
+        top:calc(50% + 4px);
+      }
+    }
   </style>
 </head>
 <body>
@@ -2354,7 +2457,11 @@
     function playCheckboxSound(checked) {
       // Browsers allow audio after the user's checkbox tap without an audio file.
       try {
-        checkboxAudioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+        if (!checkboxAudioContext) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          checkboxAudioContext = new AudioContextClass();
+        }
         const context = checkboxAudioContext;
         if (context.state === "suspended") context.resume();
 
