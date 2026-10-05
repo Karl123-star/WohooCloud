@@ -1743,7 +1743,14 @@
       .file-actions .tiny{font-size:.72rem}
     }
 
-    /* Android 8+ compatibility and small-screen hardening */
+    /* Android 5+ compatibility and small-screen hardening */
+    .modal{width:92%;max-width:620px;max-height:calc(100vh - 24px)}
+    .download-container{width:92%;max-width:520px}
+    .file-info-container{width:92%;max-width:560px}
+    .image-viewer{width:94%;max-width:900px}
+    .photo-editor{width:94%;max-width:760px}
+    .notif-panel{width:92%;max-width:360px}
+    .drawer{width:86%;max-width:340px}
     html, body{
       width:100%;
       max-width:100%;
@@ -1759,6 +1766,8 @@
       max-width:100%;
     }
 
+    /* Android 5 WebView fallbacks for CSS variables and visual effects. */
+    .topbar,.drawer,.notif-panel,.hero-panel,.auth-panel,.panel,.modal{background:#fff}
     @supports not (backdrop-filter: blur(1px)){
       .topbar,
       .drawer,
@@ -1844,6 +1853,55 @@
       .modal{
         top:calc(50% + 4px);
       }
+    }
+
+    /* Older Android WebViews may not support CSS custom properties. */
+    @supports not (--wohoo-test: red){
+      body{color:#22163a;background:#f7f4ff}
+      .topbar,.drawer,.notif-panel,.hero-panel,.auth-panel,.panel,.modal{background:#fff}
+      .brand,.section-title,h1,h2,h3,h4,h5,h6{color:#22163a}
+      .subtle,.tagline,.hero-text,.section-sub,.file-meta small{color:#6f6291}
+      .icon-btn,.link-btn,.tiny,.ghost{color:#5a3fd8}
+      .cta,.fab-upload,.file-icon,.file-info-icon{background:#5a3fd8;color:#fff}
+      .auth-tabs{background:#fff;border-color:#ddd5f0}
+      .tab-btn.active{background:#5a3fd8;color:#fff}
+      input,select,textarea{background:#fff;color:#22163a;border-color:#d8cdef}
+      .file-item,.profile-card,.mini-stat,.mini-visual{background:#fff;border-color:#ddd5f0}
+    }
+
+    /* Fallback for Android 5 browsers without CSS Grid. */
+    @supports not (display:grid){
+      .topbar-inner,
+      .auth-wrap,
+      .hero-grid,
+      .form-grid,
+      .dashboard,
+      .welcome,
+      .profile-grid,
+      .file-item,
+      .editor-controls,
+      .editor-actions{
+        display:flex;
+        flex-wrap:wrap;
+      }
+
+      .topbar-inner > *,
+      .auth-wrap > *,
+      .dashboard > *,
+      .welcome > *,
+      .form-grid > *,
+      .profile-grid > *,
+      .file-item > *{
+        flex:1 1 100%;
+      }
+
+      .field.full{flex-basis:100%}
+      .topbar-inner{justify-content:space-between}
+      .icon-btn{flex:0 0 auto}
+      .file-actions{display:flex}
+      .file-actions .tiny{flex:1 1 auto}
+      .editor-actions{justify-content:flex-end}
+      .editor-actions > *{flex:0 1 auto}
     }
   </style>
 </head>
@@ -2346,7 +2404,21 @@
     <div class="toast-wrap" id="toastWrap"></div>
   </div>
 
-  <script>
+  <!-- Babel and fetch fallback keep the app usable in older Android WebViews. -->
+  <script src="https://cdn.jsdelivr.net/npm/es6-promise@4.2.8/dist/es6-promise.auto.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.20/dist/fetch.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js"></script>
+  <script type="text/babel" data-presets="env">
+    // Small compatibility shims for Android 5 WebViews.
+    if (!window.CSS) window.CSS = {};
+    if (!window.CSS.escape) {
+      window.CSS.escape = function(value) {
+        return String(value).replace(/[^a-zA-Z0-9_-]/g, function(character) {
+          return "\\\\" + character;
+        });
+      };
+    }
+
     const SUPABASE_URL = "https://zsthiicdmljcrfodobjn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_kDMZ3zAtomZXfvWDh_t51Q_T4FassPW";
     // Try the common Render proxy upload routes. The first working route is used.
@@ -3923,11 +3995,13 @@
     $("logoutBtnMain").addEventListener("click", logout);
     $("logoutBtnDrawer").addEventListener("click", logout);
 
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) entry.target.classList.add("visible");
-      });
-    }, { threshold: 0.12 });
+    const observer = typeof IntersectionObserver !== "undefined"
+      ? new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) entry.target.classList.add("visible");
+          });
+        }, { threshold: 0.12 })
+      : { observe: function(element) { element.classList.add("visible"); } };
 
     document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
 
