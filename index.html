@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -3595,7 +3595,8 @@
           console.error("Supabase initialization failed:", error);
           state.supabase = null;
           supabaseInitPromise = null;
-          setAuthServiceStatus("Authentication service is unavailable. Check internet access and tap Login again.", true);
+          const reason = error && error.message ? error.message : String(error);
+          setAuthServiceStatus(`Authentication could not start: ${reason} Check that the app has Internet access and that the WebViewer allows JavaScript and storage.`, true);
           throw error;
         }
       })();
@@ -3748,7 +3749,7 @@
         }
       } catch (error) {
         console.error("Login initialization failed:", error);
-        toast("Authentication service is unavailable. Check the app Internet permission and try again.", "error");
+        toast(`Authentication unavailable: ${error.message || "Could not connect to Supabase."}`, "error");
       } finally {
         if (button) {
           button.disabled = false;
