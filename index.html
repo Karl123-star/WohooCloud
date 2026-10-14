@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -2420,6 +2420,15 @@
       };
     }
 
+    // Keep the app in a full browser, not inside Android WebViews such as MIT App Inventor.
+    const userAgent = navigator.userAgent || "";
+    const isAndroidWebView = /Android/i.test(userAgent) && (
+      /;\s*wv\)/i.test(userAgent) ||
+      /Version\/4\.0.*Chrome\/[\d.]+.*Mobile Safari/i.test(userAgent)
+    );
+    const isEmbedded = window.self !== window.top;
+
+    if (!isAndroidWebView && !isEmbedded) {
     const SUPABASE_URL = "https://zsthiicdmljcrfodobjn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_kDMZ3zAtomZXfvWDh_t51Q_T4FassPW";
     // Try the common Render proxy upload routes. The first working route is used.
@@ -4119,6 +4128,16 @@
 
     renderNotifications();
     initSupabase();
+    } else {
+      document.body.innerHTML = `
+        <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(180deg,#fbf9ff,#f4efff);font-family:Manrope,Arial,sans-serif;color:#22163a;text-align:center;">
+          <section style="max-width:520px;padding:32px;border-radius:24px;background:#fff;box-shadow:0 20px 60px rgba(91,63,216,.15);">
+            <div style="font-size:2.5rem;margin-bottom:12px;">☁️</div>
+            <h1 style="font-family:'Space Grotesk',Arial,sans-serif;margin:0 0 12px;">Open Wohoo Cloud in your browser</h1>
+            <p style="line-height:1.6;color:#6f6291;margin:0;">For account login and cloud features, open this page directly in Chrome, Safari, or another full web browser. Embedded viewers such as MIT App Inventor WebViewer are not supported.</p>
+          </section>
+        </main>`;
+    }
     
   </script>
 </body>
