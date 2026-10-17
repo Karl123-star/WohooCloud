@@ -2420,15 +2420,6 @@
       };
     }
 
-    // Keep the app in a full browser, not inside Android WebViews such as MIT App Inventor.
-    const userAgent = navigator.userAgent || "";
-    const isAndroidWebView = /Android/i.test(userAgent) && (
-      /;\s*wv\)/i.test(userAgent) ||
-      /Version\/4\.0.*Chrome\/[\d.]+.*Mobile Safari/i.test(userAgent)
-    );
-    const isEmbedded = window.self !== window.top;
-
-    if (!isAndroidWebView && !isEmbedded) {
     const SUPABASE_URL = "https://zsthiicdmljcrfodobjn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_kDMZ3zAtomZXfvWDh_t51Q_T4FassPW";
     // Try the common Render proxy upload routes. The first working route is used.
@@ -2469,6 +2460,46 @@
     };
 
     const $ = (id) => document.getElementById(id);
+
+    // Keep the app usable in WebViews where DOM storage is disabled. The
+    // fallback is memory-only, so data will not survive a page/app restart.
+    const memoryStorage = new Map();
+    let persistentStorageAvailable = false;
+    try {
+      const storageTestKey = "__wohoo_storage_test__";
+      window.localStorage.setItem(storageTestKey, "1");
+      window.localStorage.removeItem(storageTestKey);
+      persistentStorageAvailable = true;
+    } catch (_error) {
+      persistentStorageAvailable = false;
+    }
+
+    const appStorage = {
+      getItem(key) {
+        if (persistentStorageAvailable) {
+          try { return window.localStorage.getItem(key); } catch (_error) {}
+        }
+        return memoryStorage.has(key) ? memoryStorage.get(key) : null;
+      },
+      setItem(key, value) {
+        const text = String(value);
+        if (persistentStorageAvailable) {
+          try {
+            window.localStorage.setItem(key, text);
+            return;
+          } catch (_error) {
+            persistentStorageAvailable = false;
+          }
+        }
+        memoryStorage.set(key, text);
+      },
+      removeItem(key) {
+        memoryStorage.delete(key);
+        if (persistentStorageAvailable) {
+          try { window.localStorage.removeItem(key); } catch (_error) { persistentStorageAvailable = false; }
+        }
+      }
+    };
 
     function escapeHTML(value = "") {
       return String(value).replace(/[&<>'"]/g, character => ({
@@ -2618,20 +2649,20 @@
     }
 
     function saveLocalProfile(userId, profile) {
-      localStorage.setItem(`wohoo_profile_${userId}`, JSON.stringify(profile));
+      appStorage.setItem(`wohoo_profile_${userId}`, JSON.stringify(profile));
     }
 
     function getLocalProfile(userId) {
-      const raw = localStorage.getItem(`wohoo_profile_${userId}`);
+      const raw = appStorage.getItem(`wohoo_profile_${userId}`);
       return raw ? JSON.parse(raw) : null;
     }
 
     function saveLocalUploads(userId, uploads) {
-      localStorage.setItem(`wohoo_uploads_${userId}`, JSON.stringify(uploads));
+      appStorage.setItem(`wohoo_uploads_${userId}`, JSON.stringify(uploads));
     }
 
     function getLocalUploads(userId) {
-      const raw = localStorage.getItem(`wohoo_uploads_${userId}`);
+      const raw = appStorage.getItem(`wohoo_uploads_${userId}`);
       return raw ? JSON.parse(raw) : [];
     }
 
@@ -2788,21 +2819,21 @@
     }
 
     function getPlan() {
-      const plan = localStorage.getItem(`wohoo_plan_${state.user?.id || "guest"}`) || "free";
+      const plan = appStorage.getItem(`wohoo_plan_${state.user?.id || "guest"}`) || "free";
       return plan;
     }
 
     function getSubscriptionId() {
-      return localStorage.getItem(`wohoo_subscription_${state.user?.id || "guest"}`) || "";
+      return appStorage.getItem(`wohoo_subscription_${state.user?.id || "guest"}`) || "";
     }
 
     function setPlan(plan, subscriptionId = "") {
       if (!state.user) return;
-      localStorage.setItem(`wohoo_plan_${state.user.id}`, plan);
+      appStorage.setItem(`wohoo_plan_${state.user.id}`, plan);
       if (subscriptionId) {
-        localStorage.setItem(`wohoo_subscription_${state.user.id}`, subscriptionId);
+        appStorage.setItem(`wohoo_subscription_${state.user.id}`, subscriptionId);
       } else if (plan !== "premium") {
-        localStorage.removeItem(`wohoo_subscription_${state.user.id}`);
+        appStorage.removeItem(`wohoo_subscription_${state.user.id}`);
       }
       updateUsageUI();
     }
@@ -2844,7 +2875,7 @@
             // The ID belongs to another PayPal account/environment or is no
             // longer valid. Do not leave the UI claiming premium access.
             setPlan("free");
-            localStorage.removeItem(`wohoo_subscription_${state.user.id}`);
+            appStorage.removeItem(`wohoo_subscription_${state.user.id}`);
             throw new Error(result.error || "PayPal could not find this subscription. The saved subscription ID was cleared; create a new subscription using the PayPal button now configured by Render.");
           }
           throw new Error(result.error || `PayPal cancellation failed (${response.status}).`);
@@ -3571,12 +3602,24 @@
         try {
           await loadSupabaseScript(supabaseScripts);
           await waitForSupabaseClient(10000);
-          state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+              persistSession: true,
+              autoRefreshToken: true,
+              detectSessionInUrl: true,
+              storage: appStorage
+            }
+          });
 
           const sessionResult = await state.supabase.auth.getSession();
           if (sessionResult.error) throw sessionResult.error;
 
-          setAuthServiceStatus("Authentication service connected.", false);
+          setAuthServiceStatus(
+            persistentStorageAvailable
+              ? "Authentication service connected."
+              : "Connected, but this WebView cannot save data between sessions. Enable DOM storage for persistent login and local data.",
+            false
+          );
 
           if (sessionResult.data && sessionResult.data.session) {
             state.session = sessionResult.data.session;
@@ -3769,7 +3812,14 @@
 
     $("registerForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!state.supabase) return toast("Supabase not ready yet.", "error");
+      if (!state.supabase) {
+        try {
+          await initSupabase(true);
+        } catch (error) {
+          toast(`Authentication unavailable: ${error.message || "Could not connect to Supabase."}`, "error");
+          return;
+        }
+      }
 
       const form = new FormData(e.target);
       const profile = Object.fromEntries(form.entries());
@@ -4128,16 +4178,6 @@
 
     renderNotifications();
     initSupabase();
-    } else {
-      document.body.innerHTML = `
-        <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(180deg,#fbf9ff,#f4efff);font-family:Manrope,Arial,sans-serif;color:#22163a;text-align:center;">
-          <section style="max-width:520px;padding:32px;border-radius:24px;background:#fff;box-shadow:0 20px 60px rgba(91,63,216,.15);">
-            <div style="font-size:2.5rem;margin-bottom:12px;">☁️</div>
-            <h1 style="font-family:'Space Grotesk',Arial,sans-serif;margin:0 0 12px;">Open Wohoo Cloud in your browser</h1>
-            <p style="line-height:1.6;color:#6f6291;margin:0;">For account login and cloud features, open this page directly in Chrome, Safari, or another full web browser. Embedded viewers such as MIT App Inventor WebViewer are not supported.</p>
-          </section>
-        </main>`;
-    }
     
   </script>
 </body>
