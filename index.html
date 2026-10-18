@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wohoo Cloud</title>
+  <title>Wohoo Cloud Storage</title>
   <meta name="description" content="Wohoo Cloud Storage Service" />
+  <meta name="theme-color" content="#e8f0ff" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -2713,6 +2714,68 @@
       return data;
     }
 
+    let uploadsRealtimeChannel = null;
+    let uploadsRealtimeUserId = null;
+
+    function stopUploadsRealtime() {
+      if (!uploadsRealtimeChannel || !state.supabase) return;
+      const channel = uploadsRealtimeChannel;
+      uploadsRealtimeChannel = null;
+      uploadsRealtimeUserId = null;
+      state.supabase.removeChannel(channel).then(status => {
+        if (status !== "ok") {
+          console.warn("Could not cleanly close uploads realtime channel:", status);
+        }
+      }).catch(error => {
+        console.error("Could not close uploads realtime channel:", error);
+      });
+    }
+
+    function applyRemoteUploadChange(payload) {
+      if (!state.user) return;
+      const row = payload.new;
+      if (!row || row.id == null) return;
+      const id = String(row.id);
+      if (row.owner_id !== state.user.id) return;
+      const upload = normalizeCloudUpload(row);
+      state.uploads = mergeUploads(
+        state.uploads.filter(item => String(item.id) !== id),
+        [upload]
+      );
+
+      saveLocalUploads(state.user.id, state.uploads);
+      renderUploads();
+    }
+
+    function startUploadsRealtime() {
+      if (!state.supabase || !state.user) return;
+      if (uploadsRealtimeUserId === state.user.id && uploadsRealtimeChannel) return;
+      stopUploadsRealtime();
+
+      const userId = state.user.id;
+      uploadsRealtimeUserId = userId;
+      uploadsRealtimeChannel = state.supabase
+        .channel(`uploads:${userId}`)
+        .on("postgres_changes", {
+          event: "INSERT",
+          schema: "public",
+          table: "uploads",
+          filter: `owner_id=eq.${userId}`
+        }, applyRemoteUploadChange)
+        .on("postgres_changes", {
+          event: "UPDATE",
+          schema: "public",
+          table: "uploads",
+          filter: `owner_id=eq.${userId}`
+        }, applyRemoteUploadChange)
+        .subscribe(status => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            console.error("Uploads realtime connection failed:", status);
+            toast("Live sync is unavailable. Enable Realtime for the uploads table in Supabase.", "error");
+          }
+        });
+    }
+
     function getRemoteFileId(item) {
       let response = item.uploadResponse || item.upload_response || {};
       if (typeof response === "string") {
@@ -3122,6 +3185,17 @@
       $("downloadFileName").textContent = fileName;
       updateDownloadPanel("Downloading securely inside Wohoo…", 5);
       if (showProgressPanel) openModal("downloadModal");
+
+      if (window.WohooNative
+          && typeof window.WohooNative.downloadFile === "function"
+          && window.WohooNative.downloadFile(downloadUrl, fileName)) {
+        updateDownloadPanel("Download started. Check your device's Downloads folder.", 100);
+        if (showProgressPanel) {
+          toast("Download started.", "success");
+          setTimeout(closeModals, 1600);
+        }
+        return true;
+      }
 
       try {
         // The upload API saves a Render proxy URL such as /stream/:id.
@@ -3636,6 +3710,7 @@
               await loadUserData();
               showDashboard();
             } else {
+              stopUploadsRealtime();
               state.profile = null;
               state.uploads = [];
               showAuth();
@@ -3673,6 +3748,7 @@
         ? localUploads
         : mergeUploads(localUploads, cloudUploads);
       saveLocalUploads(state.user.id, state.uploads);
+      startUploadsRealtime();
       addNotification("Signed in", `Welcome back, ${state.profile.firstName || state.user.email}.`);
       renderProfile();
       renderUploads();
